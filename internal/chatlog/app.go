@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/sjzar/chatlog/internal/chatlog/ctx"
 	"github.com/sjzar/chatlog/internal/ui/footer"
 	"github.com/sjzar/chatlog/internal/ui/form"
@@ -141,6 +142,24 @@ func (a *App) refresh() {
 		case <-a.stopRefresh:
 			return
 		case <-tick.C:
+			// 如果当前账号为空，尝试查找微信进程
+			if a.ctx.Current == nil {
+				// 获取微信实例
+				instances := a.m.wechat.GetWeChatInstances()
+				if len(instances) > 0 {
+					// 找到微信进程，设置第一个为当前账号
+					a.ctx.SwitchCurrent(instances[0])
+					log.Info().Msgf("检测到微信进程，PID: %d，已设置为当前账号", instances[0].PID)
+				}
+			}
+
+			// 刷新当前账号状态（如果存在）
+			if a.ctx.Current != nil {
+				a.ctx.Current.RefreshStatus()
+				// 更新上下文信息
+				a.ctx.Refresh()
+			}
+
 			if a.ctx.AutoDecrypt || a.ctx.HTTPEnabled {
 				a.m.RefreshSession()
 			}

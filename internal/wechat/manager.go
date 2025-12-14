@@ -32,6 +32,11 @@ func GetAccounts() []*Account {
 	return DefaultManager.GetAccounts()
 }
 
+// GetAllProcesses 获取所有微信进程
+func GetAllProcesses() ([]*model.Process, error) {
+	return DefaultManager.GetAllProcesses()
+}
+
 // Manager 微信管理器
 type Manager struct {
 	detector   process.Detector
@@ -95,6 +100,22 @@ func (m *Manager) GetProcess(name string) (*model.Process, error) {
 // GetAccounts 获取所有账号
 func (m *Manager) GetAccounts() []*Account {
 	return m.accounts
+}
+
+// GetAllProcesses 获取所有微信进程
+func (m *Manager) GetAllProcesses() ([]*model.Process, error) {
+	// 重新加载进程信息
+	if err := m.Load(); err != nil {
+		return nil, err
+	}
+
+	// 从processMap中提取所有进程
+	processes := make([]*model.Process, 0, len(m.processMap))
+	for _, p := range m.processMap {
+		processes = append(processes, p)
+	}
+
+	return processes, nil
 }
 
 // DecryptDatabase 便捷方法：通过账号名解密数据库

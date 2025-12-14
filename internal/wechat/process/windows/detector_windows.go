@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -15,7 +16,10 @@ func initializeProcessInfo(p *process.Process, info *model.Process) error {
 	files, err := p.OpenFiles()
 	if err != nil {
 		log.Err(err).Msgf("获取进程 %d 的打开文件失败", p.Pid)
-		return err
+		// 即使获取打开文件失败，也返回进程信息（状态保持为offline）
+		// 为未登录的进程生成临时账号名称
+		info.AccountName = fmt.Sprintf("未登录微信_%d", p.Pid)
+		return nil
 	}
 
 	dbPath := V3DBFile
@@ -44,5 +48,9 @@ func initializeProcessInfo(p *process.Process, info *model.Process) error {
 		}
 	}
 
+	// 如果没有找到数据库文件，进程仍然存在，只是未登录
+	// 状态保持为 model.StatusOffline（调用方会处理）
+	// 为未登录的进程生成临时账号名称
+	info.AccountName = fmt.Sprintf("未登录微信_%d", p.Pid)
 	return nil
 }
