@@ -105,7 +105,8 @@ const (
 
 type Message struct {
 	Version    string                 `json:"-"`                  // 消息版本，内部判断
-	Seq        int64                  `json:"seq"`                // 消息序号，10位时间戳 + 3位序号
+	Seq        int64                  `json:"seq"`                // 唯一序列号 (timestamp * 1000000 + local_id)
+	ID         int64                  `json:"id"`                 // 冗余 ID 字段，确保某些客户端能正确解析
 	Time       time.Time              `json:"time"`               // 消息创建时间，10位时间戳
 	Talker     string                 `json:"talker"`             // 聊天对象，微信 ID or 群 ID
 	TalkerName string                 `json:"talkerName"`         // 聊天对象名称
@@ -318,6 +319,8 @@ func (m *Message) PlainText(showChatRoom bool, timeFormat string, host string) s
 	}
 	buf.WriteString(" ")
 
+	buf.WriteString(fmt.Sprintf("[%d] ", m.Seq))
+
 	if m.IsChatRoom && showChatRoom {
 		buf.WriteString("[")
 		if m.TalkerName != "" {
@@ -345,6 +348,9 @@ func (m *Message) PlainTextContent() string {
 	case MessageTypeText:
 		return m.Content
 	case MessageTypeImage:
+		if host, _ := m.Contents["host"].(string); host == "" {
+			return "[图片]"
+		}
 		keylist := make([]string, 0)
 		if m.Contents["md5"] != nil {
 			if md5, ok := m.Contents["md5"].(string); ok {
@@ -363,6 +369,9 @@ func (m *Message) PlainTextContent() string {
 		}
 		return fmt.Sprintf("![图片](http://%s/image/%s)", m.Contents["host"], strings.Join(keylist, ","))
 	case MessageTypeVoice:
+		if host, _ := m.Contents["host"].(string); host == "" {
+			return "[语音]"
+		}
 		if voice, ok := m.Contents["voice"]; ok {
 			return fmt.Sprintf("[语音](http://%s/voice/%s)", m.Contents["host"], voice)
 		}
@@ -370,6 +379,9 @@ func (m *Message) PlainTextContent() string {
 	case MessageTypeCard:
 		return "[名片]"
 	case MessageTypeVideo:
+		if host, _ := m.Contents["host"].(string); host == "" {
+			return "[视频]"
+		}
 		keylist := make([]string, 0)
 		if m.Contents["md5"] != nil {
 			if md5, ok := m.Contents["md5"].(string); ok {
@@ -411,6 +423,9 @@ func (m *Message) PlainTextContent() string {
 		case MessageSubTypeLink, MessageSubTypeLink2:
 			return fmt.Sprintf("[链接|%s](%s)", m.Contents["title"], m.Contents["url"])
 		case MessageSubTypeFile:
+			if host, _ := m.Contents["host"].(string); host == "" {
+				return fmt.Sprintf("[文件|%s]", m.Contents["title"])
+			}
 			return fmt.Sprintf("[文件|%s](http://%s/file/%s)", m.Contents["title"], m.Contents["host"], m.Contents["md5"])
 		case MessageSubTypeGIF:
 			return "[GIF表情]"
@@ -532,6 +547,7 @@ func (m *Message) PlainTextContent() string {
 func (m *Message) CSV(host string) []string {
 	m.SetContent("host", host)
 	return []string{
+		fmt.Sprintf("%d", m.Seq),
 		m.Time.Format("2006-01-02 15:04:05"),
 		m.SenderName,
 		m.Sender,

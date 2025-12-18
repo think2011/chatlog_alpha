@@ -70,6 +70,10 @@ func (w *DB) GetMessages(start, end time.Time, talker string, sender string, key
 	return messages, nil
 }
 
+func (w *DB) GetMessage(talker string, seq int64) (*model.Message, error) {
+	return w.repo.GetMessage(context.Background(), talker, seq)
+}
+
 type GetContactsResp struct {
 	Items []*model.Contact `json:"items"`
 }
@@ -87,6 +91,10 @@ func (w *DB) GetContacts(key string, limit, offset int) (*GetContactsResp, error
 	}, nil
 }
 
+func (w *DB) GetContact(key string) (*model.Contact, error) {
+	return w.repo.GetContact(context.Background(), key)
+}
+
 type GetChatRoomsResp struct {
 	Items []*model.ChatRoom `json:"items"`
 }
@@ -102,6 +110,10 @@ func (w *DB) GetChatRooms(key string, limit, offset int) (*GetChatRoomsResp, err
 	return &GetChatRoomsResp{
 		Items: chatRooms,
 	}, nil
+}
+
+func (w *DB) GetChatRoom(key string) (*model.ChatRoom, error) {
+	return w.repo.GetChatRoom(context.Background(), key)
 }
 
 type GetSessionsResp struct {

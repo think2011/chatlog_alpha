@@ -91,12 +91,24 @@ func (s *Service) GetMessages(start, end time.Time, talker string, sender string
 	return s.db.GetMessages(start, end, talker, sender, keyword, limit, offset)
 }
 
+func (s *Service) GetMessage(talker string, seq int64) (*model.Message, error) {
+	return s.db.GetMessage(talker, seq)
+}
+
 func (s *Service) GetContacts(key string, limit, offset int) (*wechatdb.GetContactsResp, error) {
 	return s.db.GetContacts(key, limit, offset)
 }
 
+func (s *Service) GetContact(key string) (*model.Contact, error) {
+	return s.db.GetContact(key)
+}
+
 func (s *Service) GetChatRooms(key string, limit, offset int) (*wechatdb.GetChatRoomsResp, error) {
 	return s.db.GetChatRooms(key, limit, offset)
+}
+
+func (s *Service) GetChatRoom(key string) (*model.ChatRoom, error) {
+	return s.db.GetChatRoom(key)
 }
 
 // GetSession retrieves session information

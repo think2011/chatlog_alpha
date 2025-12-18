@@ -28,6 +28,22 @@ func (r *Repository) GetMessages(ctx context.Context, startTime, endTime time.Ti
 	return messages, nil
 }
 
+// GetMessage 获取单条消息
+func (r *Repository) GetMessage(ctx context.Context, talker string, seq int64) (*model.Message, error) {
+	// 如果传入的是昵称，尝试转换为 ID
+	if contact, _ := r.GetContact(ctx, talker); contact != nil {
+		talker = contact.UserName
+	}
+
+	msg, err := r.ds.GetMessage(ctx, talker, seq)
+	if err != nil {
+		return nil, err
+	}
+
+	r.enrichMessage(msg)
+	return msg, nil
+}
+
 // EnrichMessages 补充消息的额外信息
 func (r *Repository) EnrichMessages(ctx context.Context, messages []*model.Message) error {
 	for _, msg := range messages {

@@ -103,6 +103,26 @@
 
 ## 更新日志
 
+### 2025年12月18日
+- **MCP 扩展功能大版本更新**：
+  - **媒体感知服务 (Media Perception)**：
+    - 新增 `get_media_content` 工具：支持根据消息 ID 获取解码后的媒体文件（图片自动解密、语音转 MP3）。
+    - 新增 `ocr_image_message` 工具：支持对特定图片消息进行视觉 OCR 解析（由模型驱动）。
+  - **实时消息交互 (Real-time Interaction)**：
+    - 新增 `subscribe_new_messages` 工具：允许模型通过资源更新机制订阅特定联系人或群组的实时消息流（资源路径：`chatlog://realtime/{talker}`）。
+    - 新增 `send_webhook_notification` 工具：允许模型在分析完成后触发外部 Webhook。
+  - **社交画像与分析 (Social Insights)**：
+    - 新增 `analyze_chat_activity` 工具：统计发言频率、活跃时段（带柱状图可视化模拟）。
+    - 新增 `get_user_profile` 工具：获取详细的联系人备注、群成员、群主等背景信息。
+  - **增强型提示词模板 (Prompts)**：
+    - 内置 `chat_summary_daily`（每日摘要）、`conflict_detector`（情绪冲突检测）、`relationship_milestones`（关系里程碑）模板。
+  - **跨应用检索**：
+    - 新增 `search_shared_files` 工具：专项搜索聊天记录中发送的共享文件元数据。
+- **系统底层优化**：
+  - **唯一消息 ID 系统**：引入 `(timestamp * 1000000 + local_id)` 算法，彻底解决多媒体消息在同一秒内发送导致的 ID 冲突问题。
+  - **多格式适配**：PlainText、CSV、JSON 均已同步支持显示唯一的 `MessageID` (seq)。
+  - **文本清理**：优化聊天记录输出，简化图片、语音、视频消息的显示标签（例如 `[图片]`），使模型处理更高效。
+
 ### 2025年12月16日
 - **自动解密机制优化**：
   - 增加开启前预检：开启自动解密前会自动运行一次解密测试，失败则禁止开启。

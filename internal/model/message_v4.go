@@ -34,6 +34,7 @@ import (
 // WCDB_CT_source INTEGER DEFAULT NULL
 // )
 type MessageV4 struct {
+	LocalID        int64  `json:"local_id"`         // 本地唯一 ID
 	SortSeq        int64  `json:"sort_seq"`         // 消息序号，10位时间戳 + 3位序号
 	ServerID       int64  `json:"server_id"`        // 消息 ID，用于关联 voice
 	LocalType      int64  `json:"local_type"`       // 消息类型
@@ -46,8 +47,10 @@ type MessageV4 struct {
 
 func (m *MessageV4) Wrap(talker string) *Message {
 
+	uniqueID := (m.CreateTime * 1000000) + m.LocalID
 	_m := &Message{
-		Seq:        m.SortSeq,
+		Seq:        uniqueID,
+		ID:         uniqueID,
 		Time:       time.Unix(m.CreateTime, 0),
 		Talker:     talker,
 		IsChatRoom: strings.HasSuffix(talker, "@chatroom"),

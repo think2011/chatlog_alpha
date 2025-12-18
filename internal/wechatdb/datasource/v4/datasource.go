@@ -254,7 +254,7 @@ func (ds *DataSource) GetMessages(ctx context.Context, startTime, endTime time.T
 			log.Debug().Msgf("Start time: %d, End time: %d", startTime.Unix(), endTime.Unix())
 
 			query := fmt.Sprintf(`
-				SELECT m.sort_seq, m.server_id, m.local_type, n.user_name, m.create_time, m.message_content, m.packed_info_data, m.status
+				SELECT m.local_id, m.sort_seq, m.server_id, m.local_type, n.user_name, m.create_time, m.message_content, m.packed_info_data, m.status
 				FROM %s m
 				LEFT JOIN Name2Id n ON m.real_sender_id = n.rowid
 				WHERE %s 
@@ -276,6 +276,7 @@ func (ds *DataSource) GetMessages(ctx context.Context, startTime, endTime time.T
 			for rows.Next() {
 				var msg model.MessageV4
 				err := rows.Scan(
+					&msg.LocalID,
 					&msg.SortSeq,
 					&msg.ServerID,
 					&msg.LocalType,
@@ -361,6 +362,63 @@ func (ds *DataSource) GetMessages(ctx context.Context, startTime, endTime time.T
 	}
 
 	return filteredMessages, nil
+}
+
+func (ds *DataSource) GetMessage(ctx context.Context, talker string, seq int64) (*model.Message, error) {
+	if talker == "" {
+		return nil, errors.ErrTalkerEmpty
+	}
+
+	// Seq = (create_time * 1000000) + local_id
+	createTime := seq / 1000000
+	localID := seq % 1000000
+	t := time.Unix(createTime, 0)
+
+	dbInfos := ds.getDBInfosForTimeRange(t, t.Add(time.Second))
+	if len(dbInfos) == 0 {
+		return nil, errors.TimeRangeNotFound(t, t.Add(time.Second))
+	}
+
+	_talkerMd5Bytes := md5.Sum([]byte(talker))
+	talkerMd5 := hex.EncodeToString(_talkerMd5Bytes[:])
+	tableName := "Msg_" + talkerMd5
+
+	for _, dbInfo := range dbInfos {
+		db, err := ds.dbm.OpenDB(dbInfo.FilePath)
+		if err != nil {
+			continue
+		}
+
+		query := fmt.Sprintf(`
+			SELECT m.local_id, m.sort_seq, m.server_id, m.local_type, n.user_name, m.create_time, m.message_content, m.packed_info_data, m.status
+			FROM %s m
+			LEFT JOIN Name2Id n ON m.real_sender_id = n.rowid
+			WHERE m.local_id = ?
+		`, tableName)
+
+		var msg model.MessageV4
+		err = db.QueryRowContext(ctx, query, localID).Scan(
+			&msg.LocalID,
+			&msg.SortSeq,
+			&msg.ServerID,
+			&msg.LocalType,
+			&msg.UserName,
+			&msg.CreateTime,
+			&msg.MessageContent,
+			&msg.PackedInfoData,
+			&msg.Status,
+		)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				continue
+			}
+			return nil, errors.QueryFailed("", err)
+		}
+
+		return msg.Wrap(talker), nil
+	}
+
+	return nil, errors.ErrMessageNotFound
 }
 
 // 联系人

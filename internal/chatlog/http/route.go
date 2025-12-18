@@ -134,7 +134,7 @@ func (s *Service) handleChatlog(c *gin.Context) {
 		c.Writer.Flush()
 
 		csvWriter := csv.NewWriter(c.Writer)
-		csvWriter.Write([]string{"Time", "SenderName", "Sender", "TalkerName", "Talker", "Content"})
+		csvWriter.Write([]string{"MessageID", "Time", "SenderName", "Sender", "TalkerName", "Talker", "Content"})
 		for _, m := range messages {
 			csvWriter.Write(m.CSV(c.Request.Host))
 		}
