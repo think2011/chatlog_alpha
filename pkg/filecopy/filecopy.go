@@ -649,6 +649,12 @@ func (fm *FileCopyManager) performAggressiveCleanup() {
 	}
 }
 
+// GetCacheDir returns the path to the shared temporary directory used for caching.
+func GetCacheDir() string {
+	procName := getProcessName()
+	return filepath.Join(os.TempDir(), "filecopy_"+procName)
+}
+
 // getDiskUsageGB calculates the total disk usage of temporary files in GB.
 func (fm *FileCopyManager) getDiskUsageGB() float64 {
 	var totalSize int64

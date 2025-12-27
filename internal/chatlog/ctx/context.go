@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/sjzar/chatlog/internal/chatlog/conf"
 	"github.com/sjzar/chatlog/internal/wechat"
 	"github.com/sjzar/chatlog/pkg/config"
+	"github.com/sjzar/chatlog/pkg/filecopy"
 	"github.com/sjzar/chatlog/pkg/util"
 )
 
@@ -152,7 +154,10 @@ func (c *Context) Refresh() {
 	}
 	if c.WorkUsage == "" && c.WorkDir != "" {
 		go func() {
-			c.WorkUsage = util.GetDirSize(c.WorkDir)
+			workSize := util.GetDirSize(c.WorkDir)
+			cacheDir := filecopy.GetCacheDir()
+			cacheSize := util.GetDirSize(cacheDir)
+			c.WorkUsage = fmt.Sprintf("%s (Cache: %s)", workSize, cacheSize)
 		}()
 	}
 }
