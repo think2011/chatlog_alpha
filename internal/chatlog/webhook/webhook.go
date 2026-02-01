@@ -167,7 +167,7 @@ func (m *MessageWebhook) Do(event fsnotify.Event) {
 		return
 	}
 
-	m.lastTime = messages[len(messages)-1].Time.Add(time.Second)
+	newLastTime := messages[len(messages)-1].Time.Add(time.Second)
 
 	for _, message := range messages {
 		message.SetContent("host", m.host)
@@ -190,10 +190,14 @@ func (m *MessageWebhook) Do(event fsnotify.Event) {
 	resp, err := m.client.Do(req)
 	if err != nil {
 		log.Error().Err(err).Msgf("post messages failed")
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Error().Msgf("post messages failed, status code: %d", resp.StatusCode)
+		return
 	}
+
+	m.lastTime = newLastTime
 }
