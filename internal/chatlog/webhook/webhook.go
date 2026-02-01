@@ -98,8 +98,8 @@ func NewGroup(ctx context.Context, group string, hooks []Webhook, delayMs int64)
 }
 
 func (g *Group) Callback(event fsnotify.Event) error {
-	// skip remove event
-	if !event.Op.Has(fsnotify.Create) {
+	// 只跳过 Remove 和 Chmod 事件，处理 Create、Write、Rename
+	if event.Op.Has(fsnotify.Remove) || event.Op.Has(fsnotify.Chmod) {
 		return nil
 	}
 
