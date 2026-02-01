@@ -91,7 +91,7 @@ func NewGroup(ctx context.Context, group string, hooks []Webhook, delayMs int64)
 		hooks:   hooks,
 		delayMs: delayMs,
 		ctx:     ctx,
-		ch:      make(chan fsnotify.Event, 1),
+		ch:      make(chan fsnotify.Event, 100),
 	}
 	go g.loop()
 	return g
