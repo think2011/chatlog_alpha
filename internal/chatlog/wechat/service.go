@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -85,6 +86,49 @@ func (s *Service) clearWalState(dbFile string) {
 // SetAutoDecryptErrorHandler sets the callback for auto decryption errors
 func (s *Service) SetAutoDecryptErrorHandler(handler func(error)) {
 	s.errorHandler = handler
+}
+
+// isFileLockedError checks if the error is a file locking error (temporary error that shouldn't stop the service)
+func isFileLockedError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for Windows file locking errors
+	// ERROR_SHARING_VIOLATION (32): The process cannot access the file because it is being used by another process
+	// ERROR_LOCK_VIOLATION (33): The process cannot access the file because another process has locked a portion of the file
+	if errno, ok := err.(syscall.Errno); ok {
+		if errno == 32 || errno == 33 {
+			return true
+		}
+	}
+
+	// Check wrapped errors first (to get to the root cause)
+	if wrappedErr := errors.RootCause(err); wrappedErr != nil && wrappedErr != err {
+		if isFileLockedError(wrappedErr) {
+			return true
+		}
+	}
+
+	// Check error message for file locking indicators (works across platforms)
+	errMsg := strings.ToLower(err.Error())
+	fileLockIndicators := []string{
+		"the process cannot access the file",
+		"being used by another process",
+		"file is locked",
+		"access is denied",
+		"sharing violation",
+		"lock violation",
+		"resource temporarily unavailable", // Linux/Unix
+		"device or resource busy",         // Linux/Unix
+	}
+	for _, indicator := range fileLockIndicators {
+		if strings.Contains(errMsg, indicator) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetWeChatInstances returns all running WeChat instances
@@ -232,7 +276,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 				if !s.conf.GetWalEnabled() || !workCopyExists {
 					// WAL 未开启或工作目录不存在 → 直接全量解密
 					if err := s.DecryptDBFile(dbFile); err != nil {
-						if s.errorHandler != nil {
+						if isFileLockedError(err) {
+							// 文件锁定错误：只记录警告，不停止服务
+							log.Warn().Err(err).Msgf("文件被锁定，跳过解密: %s", dbFile)
+						} else if s.errorHandler != nil {
+							// 其他严重错误：调用错误处理器
 							s.errorHandler(err)
 						}
 					}
@@ -243,7 +291,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 					// 同时看到 .db 和 WAL 变更 → 尝试增量解密
 					applied, err := s.IncrementalDecryptDBFile(dbFile)
 					if err != nil {
-						if s.errorHandler != nil {
+						if isFileLockedError(err) {
+							// 文件锁定错误：只记录警告，不停止服务
+							log.Warn().Err(err).Msgf("文件被锁定，跳过增量解密: %s", dbFile)
+						} else if s.errorHandler != nil {
+							// 其他严重错误：调用错误处理器
 							s.errorHandler(err)
 						}
 						// 增量解密出错，不回退全量（可能是密钥问题等严重错误）
@@ -258,7 +310,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 				}
 				// 没有 WAL 事件，或增量未应用 → 全量解密
 				if err := s.DecryptDBFile(dbFile); err != nil {
-					if s.errorHandler != nil {
+					if isFileLockedError(err) {
+						// 文件锁定错误：只记录警告，不停止服务
+						log.Warn().Err(err).Msgf("文件被锁定，跳过解密: %s", dbFile)
+					} else if s.errorHandler != nil {
+						// 其他严重错误：调用错误处理器
 						s.errorHandler(err)
 					}
 				} else {
@@ -270,7 +326,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 				// 只看到 WAL 变更 → 尝试增量解密
 				applied, err := s.IncrementalDecryptDBFile(dbFile)
 				if err != nil {
-					if s.errorHandler != nil {
+					if isFileLockedError(err) {
+						// 文件锁定错误：只记录警告，不停止服务
+						log.Warn().Err(err).Msgf("文件被锁定，跳过增量解密: %s", dbFile)
+					} else if s.errorHandler != nil {
+						// 其他严重错误：调用错误处理器
 						s.errorHandler(err)
 					}
 					return
@@ -282,7 +342,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 				// 增量解密未应用 → 回退全量解密
 				log.Debug().Msgf("WAL incremental not applied, fallback to full decrypt: %s", dbFile)
 				if err := s.DecryptDBFile(dbFile); err != nil {
-					if s.errorHandler != nil {
+					if isFileLockedError(err) {
+						// 文件锁定错误：只记录警告，不停止服务
+						log.Warn().Err(err).Msgf("文件被锁定，跳过解密: %s", dbFile)
+					} else if s.errorHandler != nil {
+						// 其他严重错误：调用错误处理器
 						s.errorHandler(err)
 					}
 				} else {
@@ -293,7 +357,11 @@ func (s *Service) waitAndProcess(dbFile string) {
 			// 既没有 .db 也没有 WAL 事件（理论上不应该到这里）
 			if !s.conf.GetWalEnabled() || !workCopyExists {
 				if err := s.DecryptDBFile(dbFile); err != nil {
-					if s.errorHandler != nil {
+					if isFileLockedError(err) {
+						// 文件锁定错误：只记录警告，不停止服务
+						log.Warn().Err(err).Msgf("文件被锁定，跳过解密: %s", dbFile)
+					} else if s.errorHandler != nil {
+						// 其他严重错误：调用错误处理器
 						s.errorHandler(err)
 					}
 				}
@@ -418,6 +486,7 @@ func (s *Service) getMaxWaitTimeForFile(dbFile string) time.Duration {
 	}
 	return s.getMaxWaitTime()
 }
+
 
 func isRealtimeDBFile(dbFile string) bool {
 	base := filepath.Base(dbFile)
