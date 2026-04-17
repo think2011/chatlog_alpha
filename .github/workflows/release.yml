@@ -6,6 +6,7 @@ on:
       - 'v*'
     branches:
       - main
+      - dev
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -26,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       
@@ -34,7 +35,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install UPX
-        uses: crazy-max/ghaction-upx@v3
+        uses: crazy-max/ghaction-upx@v4
         with:
           install-only: true
 
@@ -44,13 +45,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run GoReleaser (Main Branch Build)
-        if: github.ref == 'refs/heads/main'
+      - name: Run GoReleaser (Branch Snapshot Build)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
         run: goreleaser release --snapshot --clean
+
+      - name: Rename Windows binary for dev branch
+        if: github.ref == 'refs/heads/dev'
+        run: mv dist/chatlog_windows_amd64_v1/chatlog.exe dist/chatlog_windows_amd64_v1/chatlog-dev.exe
 
       - name: Update Latest Release
         if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           name: "Latest Development Build"
@@ -63,9 +68,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update Latest Dev Release
+        if: github.ref == 'refs/heads/dev'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: latest-dev
+          name: "Latest Dev Branch Build"
+          body: "这是来自 dev 分支的最新自动构建版本。仅供开发测试使用。"
+          prerelease: true
+          make_latest: false
+          files: |
+            dist/**/*.exe
+            dist/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload Artifacts
         if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: chatlog-snapshot
-          path: dist/chatlog_windows_amd64_v1/chatlog.exe
+          name: ${{ github.ref == 'refs/heads/dev' && 'chatlog-snapshot-dev' || 'chatlog-snapshot' }}
+          path: ${{ github.ref == 'refs/heads/dev' && 'dist/chatlog_windows_amd64_v1/chatlog-dev.exe' || 'dist/chatlog_windows_amd64_v1/chatlog.exe' }}
