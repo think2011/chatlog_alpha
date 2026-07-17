@@ -25,10 +25,8 @@ var (
 func GetDLLLogger() *DLLLogger {
 	dllLoggerOnce.Do(func() {
 		dllLogger = &DLLLogger{
-			enabled: true,
+			enabled: false,
 		}
-		// 尝试初始化日志文件
-		dllLogger.initLogFile()
 	})
 	return dllLogger
 }
